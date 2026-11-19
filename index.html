@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIAE: Original vs. Detrended</title>
+<meta name="description" content="Aggregate Investor Allocation to Equities, original and detrended, updated automatically from FRED.">
+<style>
+.viz-root{color-scheme:light;--surface-0:#f4f3ef;--surface-1:#fcfcfb;--border:#e2e0d9;--grid:#ebe9e3;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7972;--s1:#2a78d6;--s2:#eb6834;--ref:#8b8a84}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])) .viz-root{color-scheme:dark;--surface-0:#121211;--surface-1:#1a1a19;--border:#33322f;--grid:#2a2a28;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#94938a;--s1:#3987e5;--s2:#d95926;--ref:#8b8a84}}
+:root[data-theme="dark"] .viz-root{color-scheme:dark;--surface-0:#121211;--surface-1:#1a1a19;--border:#33322f;--grid:#2a2a28;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#94938a;--s1:#3987e5;--s2:#d95926;--ref:#8b8a84}
+*{box-sizing:border-box}body{margin:0}
+.viz-root{background:var(--surface-0);color:var(--text-primary);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh;padding:28px 18px 50px}
+.wrap{max-width:960px;margin:0 auto}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px}
+.sub{color:var(--text-secondary);margin:0 0 20px;max-width:760px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:6px}
+.tile{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.k{font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em}
+.v{font-size:30px;font-weight:650;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.n{font-size:13px;color:var(--text-secondary)}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:16px 16px 10px;margin:12px 0;position:relative}
+.card h3{font-size:15px;margin:0 0 2px}.cap{font-size:13px;color:var(--text-secondary);margin:0 0 8px}
+.plot svg{display:block;width:100%;overflow:visible}
+.tip{position:absolute;pointer-events:none;background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12.5px;box-shadow:0 4px 14px rgba(0,0,0,.12);display:none;white-space:nowrap;font-variant-numeric:tabular-nums;z-index:2}
+.tip b{display:block;margin-bottom:2px}
+p,ul{max-width:760px}li{margin:5px 0}
+a{color:var(--s1)}code{font-size:13px}
+.banner{background:var(--surface-1);border:1px solid var(--s2);border-radius:8px;padding:10px 12px;font-size:14px}
+pre{background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;overflow:auto}
+.note{font-size:13px;color:var(--text-secondary)}
+</style></head><body><div class="viz-root"><div class="wrap">
+<h1>AIAE: original vs. detrended</h1>
+<p class="sub">The original reading compares today with all of history since 1952. The detrended reading compares it with the last 20 years only. When the two disagree, the gap shows how much a "stocks are expensive" verdict depends on assuming the old average still applies.</p>
+<p class="note" id="fresh">Loading data…</p>
+<p class="banner" id="banner" hidden></p>
+<div class="tiles">
+ <div class="tile"><div class="k">Original AIAE · <span id="asof1"></span></div><div class="v" id="cur-a"></div><div class="n" id="cur-a-n"></div></div>
+ <div class="tile"><div class="k">Detrended · <span id="asof2"></span></div><div class="v" id="cur-d"></div><div class="n" id="cur-d-n"></div></div>
+</div>
+<div class="card" id="chart-original"><h3>Original AIAE</h3><p class="cap">Equities as a share of investors' total holdings of equities, bonds and cash (%). The dashed line is the 1952–present average.</p><div class="plot"></div><div class="tip"></div></div>
+<div class="card" id="chart-detrended"><h3>Detrended AIAE</h3><p class="cap">Points above (+) or below (−) the AIAE's own trailing 20-year average. Starts in 1970, the first quarter with 20 years of history.</p><div class="plot"></div><div class="tip"></div></div>
+<h2 style="font-size:18px;margin:30px 0 6px">About this page</h2>
+<ul>
+<li><b>Updates itself.</b> A GitHub Action checks FRED every Tuesday and republishes when the Fed's quarterly Z.1 release adds a new quarter (mid-March, June, September and December).</li>
+<li><b>Live FRED chart of the original AIAE:</b> <a href="https://fred.stlouisfed.org/graph/?g=2178M">fred.stlouisfed.org/graph/?g=2178M</a></li>
+<li><b>Code and raw data:</b> <a href="https://github.com/spinchange/aiae">github.com/spinchange/aiae</a> (<a href="data/aiae.json">data/aiae.json</a>)</li>
+</ul>
+<p class="note">AIAE = (NCBEILQ027S + FBCELLQ027S) ÷ (those + BCNSDODNS + CMDEBT + FGSDODNS + SLGSDODNS + DODFFSWCMI). Detrended = AIAE minus its trailing 80-quarter average (pre-1952 data is annual and is included in early averages). Source: Federal Reserve Z.1 Financial Accounts via FRED.</p>
+</div></div>
+<script>
+const STALE_DAYS=21;
+async function boot(){
+ let data,status;
+ try{
+  [data,status]=await Promise.all(['data/aiae.json','data/status.json'].map(u=>fetch(u,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error(u+' '+r.status);return r.json();})));
+ }catch(e){document.getElementById('banner').textContent='Data could not be loaded ('+e.message+'). The update workflow may not have run yet.';document.getElementById('banner').hidden=false;return;}
+ window.R=data.rows.filter(r=>r[0]>='1952Q1');
+ const chk=new Date(status.last_checked),upd=new Date(data.data_updated);
+ const f=d=>d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+ document.getElementById('fresh').textContent='Data through '+data.latest_quarter.replace('Q',' Q')+' · updated '+f(upd)+' · last checked '+f(chk)+'.';
+ if((Date.now()-chk)/864e5>STALE_DAYS){const b=document.getElementById('banner');b.textContent='Heads up: the data hasn\'t been checked in '+Math.round((Date.now()-chk)/864e5)+' days. The update workflow may have stopped; see the repo\'s Actions tab.';b.hidden=false;}
+ main();
+}
+function main(){
+
+const css=n=>getComputedStyle(document.querySelector('.viz-root')).getPropertyValue(n).trim();
+const fmt=(v,d=1)=>(v<0?'−':'')+Math.abs(v).toFixed(d);
+const yr=q=>+q.slice(0,4)+(+q[5]-1)/4;
+const last=R[R.length-1];
+const mean=R.reduce((s,r)=>s+r[1],0)/R.length;
+const prevMax=R.slice(0,-1).reduce((m,r)=>r[1]>m[1]?r:m,R[0]);
+document.getElementById('asof1').textContent=document.getElementById('asof2').textContent=last[0].replace('Q',' Q');
+document.getElementById('cur-a').textContent=last[1].toFixed(1)+'%';
+document.getElementById('cur-a-n').textContent=(last[1]>prevMax[1]?'Record high; previous peak ':'Peak ')+prevMax[1].toFixed(1)+'% ('+prevMax[0].replace('Q',' Q')+'). Long-run average '+mean.toFixed(1)+'%.';
+const D=R.filter(r=>r[2]!=null);const dmax=D.reduce((m,r)=>r[2]>m[2]?r:m,D[0]);
+document.getElementById('cur-d').textContent=(last[2]>0?'+':'')+fmt(last[2])+' pts';
+document.getElementById('cur-d-n').textContent=(last[2]>=0?'Above':'Below')+' its 20-year average. Peak was +'+dmax[2].toFixed(1)+' ('+dmax[0].replace('Q',' Q')+').';
+function draw(id,pts,opts){
+ const card=document.getElementById(id),host=card.querySelector('.plot'),tip=card.querySelector('.tip');
+ const W=host.clientWidth||600,H=Math.max(200,Math.min(280,W*0.4)),m={t:10,r:12,b:26,l:40};
+ const x0=1952,x1=yr(last[0]);const vals=pts.map(p=>p[1]).concat(opts.ref!=null?[opts.ref]:[]);
+ const lo=Math.floor(Math.min(...vals)/opts.step)*opts.step,hi=Math.ceil(Math.max(...vals)/opts.step)*opts.step;
+ const x=v=>m.l+(v-x0)/(x1-x0)*(W-m.l-m.r),y=v=>m.t+(hi-v)/(hi-lo)*(H-m.t-m.b);
+ const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('height',H);
+ const el=(t,a)=>{const e=document.createElementNS(ns,t);for(const k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e;};
+ for(let v=lo;v<=hi;v+=opts.step){el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:v===0?css('--text-muted'):css('--grid'),'stroke-width':1});el('text',{x:m.l-6,y:y(v)+4,'text-anchor':'end','font-size':11,fill:css('--text-muted')}).textContent=(v>0&&opts.signed?'+':'')+v+opts.unit;}
+ const st=W<480?20:10;for(let yy=1960;yy<=2020;yy+=st)el('text',{x:x(yy),y:H-6,'text-anchor':'middle','font-size':11,fill:css('--text-muted')}).textContent=yy;
+ if(opts.ref!=null){el('line',{x1:m.l,x2:W-m.r,y1:y(opts.ref),y2:y(opts.ref),stroke:css('--ref'),'stroke-width':1.5,'stroke-dasharray':'5 4'});}
+ el('path',{d:pts.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(1)+','+y(p[1]).toFixed(1)).join(''),fill:'none',stroke:css(opts.color),'stroke-width':2,'stroke-linejoin':'round'});
+ const lp=pts[pts.length-1];el('circle',{cx:x(lp[0]),cy:y(lp[1]),r:4,fill:css(opts.color),stroke:css('--surface-1'),'stroke-width':2});
+ const cross=el('line',{y1:m.t,y2:H-m.b,stroke:css('--text-muted'),'stroke-width':1,visibility:'hidden'});
+ const dot=el('circle',{r:4,fill:css(opts.color),stroke:css('--surface-1'),'stroke-width':2,visibility:'hidden'});
+ const hit=el('rect',{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:'transparent'});
+ hit.addEventListener('pointermove',ev=>{const r=svg.getBoundingClientRect(),px=(ev.clientX-r.left)*W/r.width;let b=pts[0];for(const p of pts)if(Math.abs(x(p[0])-px)<Math.abs(x(b[0])-px))b=p;
+  cross.setAttribute('x1',x(b[0]));cross.setAttribute('x2',x(b[0]));cross.setAttribute('visibility','visible');dot.setAttribute('cx',x(b[0]));dot.setAttribute('cy',y(b[1]));dot.setAttribute('visibility','visible');
+  tip.replaceChildren();const h=document.createElement('b');h.textContent=b[2];tip.appendChild(h);const d=document.createElement('div');d.textContent=opts.label(b[1]);tip.appendChild(d);
+  tip.style.display='block';const cr=card.getBoundingClientRect(),hr=host.getBoundingClientRect();let lx=hr.left-cr.left+x(b[0])*hr.width/W+12;if(lx+tip.offsetWidth>card.clientWidth-6)lx-=tip.offsetWidth+24;tip.style.left=Math.max(6,lx)+'px';tip.style.top=(hr.top-cr.top+8)+'px';});
+ hit.addEventListener('pointerleave',()=>{tip.style.display='none';cross.setAttribute('visibility','hidden');dot.setAttribute('visibility','hidden');});
+ host.replaceChildren(svg);}
+const render=()=>{
+ draw('chart-original',R.map(r=>[yr(r[0]),r[1],r[0].replace('Q',' Q')]),{color:'--s1',step:10,unit:'%',ref:mean,label:v=>'AIAE: '+v.toFixed(1)+'%  (avg '+mean.toFixed(1)+'%)'});
+ draw('chart-detrended',D.map(r=>[yr(r[0]),r[2],r[0].replace('Q',' Q')]),{color:'--s2',step:5,unit:'',signed:true,label:v=>(v>0?'+':'')+fmt(v)+' pts vs. 20-yr avg'});};
+render();let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(render,120);});
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',render);
+
+}
+boot();
+</script></body></html>

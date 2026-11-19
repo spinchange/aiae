@@ -1,0 +1,54 @@
+name: Update AIAE data
+
+on:
+  schedule:
+    - cron: "17 14 * * 2"   # Tuesdays 14:17 UTC (8:17 or 9:17 am Central)
+  workflow_dispatch:         # "Run workflow" button on the Actions tab
+  push:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - ".github/workflows/update.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-aiae
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch FRED data and rebuild data/aiae.json
+        id: update
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python scripts/update.py
+
+      - name: Commit if data changed (or monthly heartbeat)
+        run: |
+          last=$(git log -1 --format=%ct)
+          age_days=$(( ( $(date +%s) - last ) / 86400 ))
+          if [ "${{ steps.update.outputs.changed }}" = "true" ]; then
+            git add data/aiae.json data/status.json
+            msg="Update AIAE data through $(python -c "import json;print(json.load(open('data/aiae.json'))['latest_quarter'])")"
+          elif [ "$age_days" -ge 25 ]; then
+            # Keeps the repo active so GitHub doesn't disable the schedule after 60 idle days.
+            git add data/status.json
+            msg="Heartbeat: data checked, no change"
+          else
+            echo "No data change; last commit ${age_days} days ago. Nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git commit -m "$msg"
+          git push
