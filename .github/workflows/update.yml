@@ -33,12 +33,18 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python scripts/update.py
 
+      - name: Render social card (og.png)
+        if: steps.update.outputs.changed == 'true' || hashFiles('og.png') == ''
+        run: |
+          pip install --quiet matplotlib
+          python scripts/make_card.py
+
       - name: Commit if data changed (or monthly heartbeat)
         run: |
           last=$(git log -1 --format=%ct)
           age_days=$(( ( $(date +%s) - last ) / 86400 ))
           if [ "${{ steps.update.outputs.changed }}" = "true" ]; then
-            git add data/aiae.json data/status.json
+            git add data/aiae.json data/status.json og.png index.html
             msg="Update AIAE data through $(python -c "import json;print(json.load(open('data/aiae.json'))['latest_quarter'])")"
           elif [ "$age_days" -ge 25 ]; then
             # Keeps the repo active so GitHub doesn't disable the schedule after 60 idle days.
