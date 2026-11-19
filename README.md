@@ -5,7 +5,7 @@ A self-updating page tracking the **Aggregate Investor Allocation to Equities (A
 - **Original AIAE**, compared with its full history since 1952.
 - **Detrended AIAE**, the AIAE minus its trailing 20-year (80-quarter) average. This shows how stretched the reading is against recent norms rather than mid-century ones.
 
-**Live page:** https://spinchange.github.io/aiae/
+**Live page:** https://spinchange.com/aiae/
 
 ## Formula
 
